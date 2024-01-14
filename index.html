@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+ <link rel="stylesheet" href="styles.css" />
+<link href="https://fonts.googleapis.com/css2?family=Acme&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Acme&family=Alata&display=swap" rel="stylesheet">
+  <title>Subir foto y convertir en caricatura</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script async src="https://docs.opencv.org/master/opencv.js" onload="initialize();" type="text/javascript"></script>
+  <script src="https://cdn.rawgit.com/konvajs/konva/2.7.6/konva.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.0/css/all.min.css" />
+</head>
+<body>
+
+<img src="https://app.hundezonen.ch/docs/111956-1%20copia%206.jpg"class="icono" alt="Descripción de la imagen">
+<h1></h1>
+ <form>
+  <!-- Botón personalizado para seleccionar archivos -->
+<label for="photo" class="fa fa-camera" class="btn-select-file"></label>
+<span class="file-name"></span>
+<input type="file" id="photo" accept="image/*">
+  <div id="uploaded-image"></div>
+  <div id="thumbnail-container" style="display: none;">
+
+  </div>
+  <div id="result"></div>
+ <canvas id="original-image"></canvas>
+  <div id="loader" class="loader" style="display: none;"></div>
+
+</form>
+
+<div id="message" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.7); color: white; padding: 10px; border-radius: 5px; font-size: 16px;">
+  Drücke auf das Bild, um es zu teilen oder herunterzuladen.
+</div>
+
+<script>
+document.getElementById('share-btn').addEventListener('click', function() {
+  // Obtener la imagen actual
+  const img = document.getElementById('uploaded-image').querySelector('img');
+  
+  // Obtener la URL de la imagen
+  const imageUrl = img.src;
+  
+  // Compartir en Facebook
+  const fbShareUrl = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(imageUrl);
+  window.open(fbShareUrl, '_blank');
+  
+  // Compartir en Twitter
+  const twShareUrl = 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(imageUrl);
+  window.open(twShareUrl, '_blank');
+  
+  // Compartir en Pinterest
+  const pinShareUrl = 'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(imageUrl);
+  window.open(pinShareUrl, '_blank');
+});
+
+</script>
+
+<script>
+
+    let faceCascade;
+    let originalImage;
+    let downloadBtn;
+
+async function initialize() {
+  faceCascade = new cv.CascadeClassifier();
+  let utils = new Utils('');
+  let faceCascadeFile = 'haarcascade_frontalface_default.xml';
+  let faceCascadeData = await utils.createFileFromUrl(faceCascadeFile, faceCascadeFile, () => {});
+  faceCascade.load(faceCascadeData);
+
+  downloadBtn = document.getElementById('download-btn');
+  downloadBtn.addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = 'caricatura.png';
+    link.href = canvas.toDataURL();
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+
+  document.getElementById('share-btn').addEventListener('click', function() {
+
+    const img = document.getElementById('uploaded-image').querySelector('img');
+  
+
+    const imageUrl = img.src;
+  
+
+    const fbShareUrl = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(imageUrl);
+    window.open(fbShareUrl, '_blank');
+  
+
+    const twShareUrl = 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(imageUrl);
+    window.open(twShareUrl, '_blank');
+
+    const pinShareUrl = 'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(imageUrl);
+    window.open(pinShareUrl, '_blank');
+  });
+}
+
+document.getElementById("photo").addEventListener("change", loadImage);
+
+function loadImage() {
+  const input = document.querySelector("#photo");
+  const file = input.files[0];
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    originalImage = new Image();
+    originalImage.src = reader.result;
+    originalImage.onload = () => {
+      convertToCartoon();
+    };
+  };
+
+  reader.readAsDataURL(file);
+}
+
+function showOriginalImage(image) {
+  const imgContainer = document.getElementById("uploaded-image");
+  imgContainer.innerHTML = "";
+  const img = document.createElement("img");
+  img.src = image.src;
+  img.width = image.width;
+  img.height = image.height;
+  img.onclick = () => replaceOriginalImage(image.src);
+  imgContainer.appendChild(img);
+}
+
+
+function createThumbnail(thumbnailId, effectFunction) {
+  const image = originalImage;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = image.width;
+  canvas.height = image.height;
+
+  ctx.drawImage(image, 0, 0);
+
+  const resultImageData = effectFunction(ctx, canvas.width, canvas.height);
+ctx.putImageData(resultImageData, 0, 0);
+
+  const img = document.getElementById(thumbnailId);
+  img.src = canvas.toDataURL();
+  img.onclick = () => replaceOriginalImage(canvas.toDataURL());
+}
+
+function createCartoonThumbnail(thumbnailId) {
+  const image = originalImage;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = image.width;
+  canvas.height = image.height;
+
+  ctx.drawImage(image, 0, 0);
+
+  const resultImageData = applyCartoonEffect(ctx, canvas.width, canvas.height);
+  ctx.putImageData(resultImageData, 0, 0);
+
+  const img = new Image();
+  img.onload = function() {
+    document.getElementById(thumbnailId).src = img.src;
+  };
+  img.src = canvas.toDataURL();
+
+  img.onclick = () => replaceOriginalImage(canvas.toDataURL());
+}
+
+function replaceOriginalImage(newSrc) {
+  const imgContainer = document.getElementById("uploaded-image");
+  imgContainer.innerHTML = "";
+  const img = document.createElement("img");
+  img.src = newSrc;
+  img.width = originalImage.width;
+  img.height = originalImage.height;
+  img.onclick = () => replaceOriginalImage(originalImage.src);
+  imgContainer.appendChild(img);
+}
+
+
+function applySepia(ctx, width, height) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    const tr = Math.min(0.393 * r + 0.769 * g + 0.189 * b, 255);
+    const tg = Math.min(0.349 * r + 0.686 * g + 0.168 * b, 255);
+    const tb = Math.min(0.272 * r + 0.534 * g + 0.131 * b, 255);
+
+    data[i] = tr;
+    data[i + 1] = tg;
+    data[i + 2] = tb;
+  }
+
+  return imageData;
+}
+
+function applyCartoonEffect(ctx, width, height) {
+  const src = cv.imread(ctx.canvas);
+  const blurred = new cv.Mat();
+  cv.medianBlur(src, blurred, 5);
+
+  const gray = new cv.Mat();
+  cv.cvtColor(blurred, gray, cv.COLOR_RGBA2GRAY);
+
+  const laplacian = new cv.Mat();
+  cv.Laplacian(gray, laplacian, cv.CV_8U, 5);
+
+  const mask = new cv.Mat();
+  cv.threshold(laplacian, mask, 30, 255, cv.THRESH_BINARY_INV);
+
+  const result = new cv.Mat();
+  src.copyTo(result, mask);
+
+  // Convert the result image to RGB color space
+  cv.cvtColor(result, result, cv.COLOR_RGBA2RGB);
+
+  // Show the result on the canvas
+  cv.imshow(ctx.canvas, result);
+
+  // Get the image data from the canvas
+  const resultImageData = ctx.getImageData(0, 0, width, height);
+
+  // Clean up
+  src.delete();
+  blurred.delete();
+  gray.delete();
+  laplacian.delete();
+  mask.delete();
+  result.delete();
+
+  return resultImageData;
+}
+
+function addClickEventToImage(image) {
+  image.addEventListener('click', () => {
+    const shareData = {
+      title: 'Mi caricatura',
+      text: 'Schauen Sie sich diesen Cartoon an, den ich gerade erstellt habe!',
+      url: image.src,
+    };
+    if (navigator.share) {
+      navigator.share(shareData)
+        .then(() => console.log('Das Bild wurde erfolgreich geteilt'))
+        .catch((error) => console.error('Fehler beim Teilen des Bildes', error));
+    } else {
+      if (/Android/i.test(navigator.userAgent)) {
+        const link = document.createElement('a');
+        link.href = image.src;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const link = document.createElement('a');
+        link.download = 'caricatura.png';
+        link.href = image.src;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    }
+  });
+}
+
+function showMessage() {
+  const message = document.getElementById('message');
+  message.style.display = 'block';
+  setTimeout(() => {
+    message.style.display = 'none';
+  }, 2500);
+}
+
+async function convertToCartoon() {
+  // Oculta cualquier imagen previamente convertida y el botón de descarga
+  const resultDiv = document.getElementById("result");
+  resultDiv.innerHTML = "";
+
+  // Muestra el loader
+  document.getElementById("loader").style.display = "block";
+
+  const input = document.querySelector('#photo');
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = () => {
+    const image = new Image();
+    image.src = reader.result;
+    image.onload = () => {
+      // Oculta el loader
+      document.getElementById("loader").style.display = "none";
+
+      const src = cv.imread(image);
+      const blurred = new cv.Mat();
+      cv.medianBlur(src, blurred, 5);
+
+      const gray = new cv.Mat();
+      cv.cvtColor(blurred, gray, cv.COLOR_RGBA2GRAY);
+
+      const laplacian = new cv.Mat();
+      cv.Laplacian(gray, laplacian, cv.CV_8U, 5);
+
+      const mask = new cv.Mat();
+      cv.threshold(laplacian, mask, 30, 255, cv.THRESH_BINARY_INV);
+
+      const result = new cv.Mat();
+      src.copyTo(result, mask);
+
+      // Convert the result image to RGB color space
+      cv.cvtColor(result, result, cv.COLOR_RGBA2RGB);
+
+      // Create a canvas element
+      const canvas = document.createElement('canvas');
+      canvas.width = result.cols;
+      canvas.height = result.rows;
+
+      // Show the result on the canvas
+      cv.imshow(canvas, result);
+
+      // Replace the original image with the result image
+      const imgContainer = document.getElementById('uploaded-image');
+      imgContainer.innerHTML = '';
+      const img = new Image();
+      img.src = canvas.toDataURL();
+      img.width = originalImage.width;
+      img.height = originalImage.height;
+      imgContainer.appendChild(img);
+
+      // Show the message
+      showMessage();
+
+      // Clean up
+      src.delete();
+      blurred.delete();
+      gray.delete();
+      laplacian.delete();
+      mask.delete();
+      result.delete();
+    };
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('download-btn').addEventListener('click', () => {
+  // Crea un enlace para descargar la imagen
+  const link = document.createElement('a');
+  link.download = 'caricatura.png'; // Nombre de archivo de la imagen
+  link.href = canvas.toDataURL(); // URL de la imagen convertida
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+});
+ </script>
+  </body>
+</html>
