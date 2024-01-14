@@ -24,3 +24,4 @@ Contributions
 
 Contributions to this project are welcomed. If you have ideas to improve the application or add new features, please consider submitting a pull request or creating an issue.
 
+![Project screenshot](https://app.hundezonen.ch/docs/Captura%20de%20pantalla%202024-01-14%20a%20las%203.08.40.png)
